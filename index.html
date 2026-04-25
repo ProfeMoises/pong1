@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Pong Arcade - Clásico vs IA</title>
+    <style>
+        * {
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: linear-gradient(145deg, #0a0f1e 0%, #070b14 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Courier New', 'VT323', 'Monaco', monospace;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .game-container {
+            background: #000000aa;
+            border-radius: 32px;
+            padding: 20px;
+            backdrop-filter: blur(2px);
+            box-shadow: 0 20px 35px rgba(0, 0, 0, 0.5), inset 0 0 30px rgba(0, 255, 255, 0.1);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+        }
+
+        canvas {
+            display: block;
+            margin: 0 auto;
+            border-radius: 20px;
+            box-shadow: 0 0 0 2px #0ff3, 0 10px 30px black;
+            cursor: none;
+            background-color: #010108;
+        }
+
+        .info-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-top: 20px;
+            gap: 25px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .score-board {
+            display: flex;
+            gap: 45px;
+            background: #0a0f1fcc;
+            backdrop-filter: blur(4px);
+            padding: 8px 30px;
+            border-radius: 60px;
+            border: 1px solid cyan;
+            box-shadow: 0 0 10px cyan;
+        }
+
+        .score {
+            text-align: center;
+            font-size: 2.8rem;
+            font-weight: bold;
+            letter-spacing: 4px;
+            color: #0ff;
+            text-shadow: 0 0 8px #0ff, 0 0 2px #0aa;
+            font-family: 'Courier New', monospace;
+            line-height: 1;
+        }
+
+        .score span {
+            font-size: 1rem;
+            display: block;
+            color: #99f2ff;
+            letter-spacing: 2px;
+            text-shadow: none;
+        }
+
+        button {
+            background: #11151f;
+            border: 2px solid #0ff;
+            color: #0ff;
+            font-family: 'Courier New', monospace;
+            font-size: 1.2rem;
+            font-weight: bold;
+            padding: 8px 24px;
+            border-radius: 60px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 0 5px #0ff8;
+            letter-spacing: 1px;
+        }
+
+        button:hover {
+            background: #0ff2;
+            box-shadow: 0 0 15px #0ff;
+            transform: scale(1.02);
+            color: #fff;
+            border-color: white;
+        }
+
+        .controls-hint {
+            background: #010014aa;
+            padding: 6px 15px;
+            border-radius: 40px;
+            font-size: 0.85rem;
+            color: #8dd0ff;
+            border-left: 3px solid cyan;
+            font-weight: bold;
+        }
+
+        .controls-hint i {
+            font-style: normal;
+            display: inline-block;
+            background: #0ff2;
+            padding: 2px 8px;
+            border-radius: 30px;
+            margin: 0 4px;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 15px;
+            font-size: 0.7rem;
+            color: #4f6f8f;
+        }
+    </style>
+</head>
+<body>
+<div>
+    <div class="game-container">
+        <canvas id="pongCanvas" width="1000" height="550"></canvas>
+
+        <div class="info-panel">
+            <div class="score-board">
+                <div class="score">
+                    <span>JUGADOR</span>
+                    <span id="playerScore">0</span>
+                </div>
+                <div class="score">
+                    <span>IA</span>
+                    <span id="aiScore">0</span>
+                </div>
+            </div>
+            <button id="resetButton">⟳ REINICIAR</button>
+            <div class="controls-hint">
+                🖱️ <i>Mueve el MOUSE</i> sobre el canvas → controla la paleta izquierda
+            </div>
+        </div>
+        <footer>✦ PONG ARCADE ✦ | Golpeo con efecto angular | IA inteligente</footer>
+    </div>
+</div>
+
+<script>
+    (function(){
+        // ----- ELEMENTOS DOM -----
+        const canvas = document.getElementById('pongCanvas');
+        const ctx = canvas.getContext('2d');
+        const playerScoreSpan = document.getElementById('playerScore');
+        const aiScoreSpan = document.getElementById('aiScore');
+        const resetBtn = document.getElementById('resetButton');
+
+        // ----- DIMENSIONES CANVAS -----
+        const CANVAS_W = 1000;
+        const CANVAS_H = 550;
+        canvas.width = CANVAS_W;
+        canvas.height = CANVAS_H;
+
+        // ----- PARÁMETROS DEL JUEGO -----
+        // Paletas
+        const PADDLE_W = 12;
+        const PADDLE_H = 90;
+        const PADDLE_SPEED = 7.5;    // velocidad máxima IA / movimiento (píxeles/frame)
+
+        // Pelota
+        const BALL_SIZE = 9;          // diámetro (cuadrada pero redondeada, círculo)
+        let ball = {
+            x: CANVAS_W/2,
+            y: CANVAS_H/2,
+            dx: 4.2,
+            dy: 2.8,
+            radius: BALL_SIZE/2
+        };
+
+        // Paletas
+        let leftPaddle = {
+            x: 25,
+            y: CANVAS_H/2 - PADDLE_H/2,
+            w: PADDLE_W,
+            h: PADDLE_H
+        };
+        let rightPaddle = {
+            x: CANVAS_W - 25 - PADDLE_W,
+            y: CANVAS_H/2 - PADDLE_H/2,
+            w: PADDLE_W,
+            h: PADDLE_H
+        };
+
+        // Marcador
+        let playerScore = 0;
+        let aiScore = 0;
+
+        // Estado de juego
+        let waitingForServe = false;     // si está en pausa tras gol
+        let serveTimeout = null;          // timeout del saque
+        let lastScoredSide = null;        // 'player' o 'ai' para definir dirección del saque
+
+        // Velocidad base de la pelota (se reinicia a este módulo)
+        const BASE_SPEED = 4.5;
+        // Factor de incremento de velocidad tras cada impacto (para hacerlo más intenso)
+        const SPEED_INCREASE_FACTOR = 1.02;
+        // Velocidad máxima permitida para la pelota (divertido pero no loco)
+        const MAX_SPEED = 9.5;
+
+        // Parámetros de la IA (movimiento suave pero desafiante)
+        const AI_SPEED = 5.4;
+        
+        // Bandera para evitar múltiples colisiones en un mismo frame
+        let collisionCooldown = false;
+
+        // ----- FUNCIONES AUXILIARES -----
+        function updateScoreUI() {
+            playerScoreSpan.innerText = playerScore;
+            aiScoreSpan.innerText = aiScore;
+        }
+
+        // Limitar paletas dentro del canvas
+        function clampPaddle(paddle) {
+            if(paddle.y < 0) paddle.y = 0;
+            if(paddle.y + paddle.h > CANVAS_H) paddle.y = CANVAS_H - paddle.h;
+        }
+
+        // Reinicio completo del juego (marcadores, bola activa, sin espera)
+        function fullResetGame() {
+            // cancelar cualquier saque pendiente
+            if(serveTimeout) {
+                clearTimeout(serveTimeout);
+                serveTimeout = null;
+            }
+            waitingForServe = false;
+            // Resetear puntajes
+            playerScore = 0;
+            aiScore = 0;
+            updateScoreUI();
+            
+            // Posicionar paletas en el centro
+            leftPaddle.y = CANVAS_H/2 - PADDLE_H/2;
+            rightPaddle.y = CANVAS_H/2 - PADDLE_H/2;
+            
+            // Centrar pelota y velocidad inicial con dirección balanceada
+            ball.x = CANVAS_W/2;
+            ball.y = CANVAS_H/2;
+            // Dirección inicial: hacia la IA (derecha) con componente vertical aleatoria entre -3 y 3
+            let randomDy = (Math.random() * 5) - 2.5;
+            ball.dx = BASE_SPEED;
+            ball.dy = randomDy !== 0 ? randomDy : (Math.random() > 0.5 ? 2.2 : -2.2);
+            // Asegurar que no sea demasiado horizontal aburrido
+            if(Math.abs(ball.dy) < 1.2) ball.dy = ball.dy > 0 ? 1.8 : -1.8;
+            
+            // Normalizar velocidad para mantener módulo BASE_SPEED aprox
+            const currentMag = Math.hypot(ball.dx, ball.dy);
+            if(currentMag > 0) {
+                ball.dx = (ball.dx / currentMag) * BASE_SPEED;
+                ball.dy = (ball.dy / currentMag) * BASE_SPEED;
+            }
+            lastScoredSide = null;
+            collisionCooldown = false;
+        }
+
+        // Servir la bola después de un punto (inicia el movimiento)
+        function serveBall(directionSign) {
+            // directionSign: 1 = hacia la derecha (IA), -1 = hacia la izquierda (Jugador)
+            ball.x = CANVAS_W/2;
+            ball.y = CANVAS_H/2;
+            
+            // velocidad horizontal base
+            let newDx = BASE_SPEED * directionSign;
+            // componente vertical aleatoria más variada (-3.2 a 3.2)
+            let newDy = (Math.random() * 6.4) - 3.2;
+            if(Math.abs(newDy) < 0.8) newDy = newDy > 0 ? 1.2 : -1.2;
+            
+            ball.dx = newDx;
+            ball.dy = newDy;
+            // mantener módulo aproximado BASE_SPEED (pero más natural)
+            const mag = Math.hypot(ball.dx, ball.dy);
+            const targetMag = BASE_SPEED;
+            if(mag > 0.01) {
+                ball.dx = (ball.dx / mag) * targetMag;
+                ball.dy = (ball.dy / mag) * targetMag;
+            }
+            
+            waitingForServe = false;
+            collisionCooldown = false;
+            if(serveTimeout) {
+                clearTimeout(serveTimeout);
+                serveTimeout = null;
+            }
+        }
+
+        // Manejar cuando alguien anota
+        function handleScore(side) {
+            if(waitingForServe) return; // ya estamos en pausa por otro punto
+            
+            if(side === 'player') {     // IA falló, bola tocó borde derecho -> punto para jugador
+                playerScore++;
+                updateScoreUI();
+                lastScoredSide = 'player';   // anotó jugador, el siguiente saque va hacia IA
+            } 
+            else if(side === 'ai') {    // jugador falló -> punto para IA
+                aiScore++;
+                updateScoreUI();
+                lastScoredSide = 'ai';       // anotó IA, siguiente saque va hacia el jugador
+            }
+            
+            // Pausar movimiento de la bola
+            waitingForServe = true;
+            
+            // Limpiar timeout anterior
+            if(serveTimeout) clearTimeout(serveTimeout);
+            
+            // Programar saque después de 1 segundo
+            serveTimeout = setTimeout(() => {
+                // Definir dirección: Si el último en anotar fue el jugador, la bola va hacia IA (derecha, +)
+                // Si anotó IA, la bola va hacia el jugador (izquierda, -)
+                let direction = 1;  // por defecto hacia derecha
+                if(lastScoredSide === 'ai') {
+                    direction = -1;   // hacia el jugador
+                } else if(lastScoredSide === 'player') {
+                    direction = 1;
+                } else {
+                    direction = (Math.random() > 0.5) ? 1 : -1;
+                }
+                serveBall(direction);
+                serveTimeout = null;
+            }, 880);
+        }
+
+        // ----- COLISIONES CON PALETAS (con efecto angular y aumento vel)-----
+        function handlePaddleCollision(paddle, isLeftPaddle) {
+            // intersección entre rectángulo de paleta y bola
+            const ballLeft = ball.x - ball.radius;
+            const ballRight = ball.x + ball.radius;
+            const ballTop = ball.y - ball.radius;
+            const ballBottom = ball.y + ball.radius;
+            
+            const paddleLeft = paddle.x;
+            const paddleRight = paddle.x + paddle.w;
+            const paddleTop = paddle.y;
+            const paddleBottom = paddle.y + paddle.h;
+            
+            if(ballRight > paddleLeft && ballLeft < paddleRight && ballBottom > paddleTop && ballTop < paddleBottom) {
+                // Evita múltiples rebotes por frame
+                if(collisionCooldown) return false;
+                collisionCooldown = true;
+                
+                // Calcular offset desde el centro de la paleta (-0.5 a 0.5)
+                const hitPos = (ball.y - (paddle.y + paddle.h/2)) / (paddle.h/2);
+                // Limitar el factor angular para no romper la física
+                const angleFactor = Math.min(Math.max(hitPos, -0.85), 0.85) * 0.65;
+                
+                // Invertir dirección X y añadir efecto angular
+                ball.dx = -ball.dx;
+                // Nuevo dy con influencia basada en el punto de impacto
+                let newDy = ball.dy + angleFactor * 3.2;
+                // Limitar el ángulo vertical (que no se vuelva demasiado empinado)
+                newDy = Math.min(Math.max(newDy, -6.5), 6.5);
+                ball.dy = newDy;
+                
+                // Pequeño ajuste para evitar que quede pegado dentro de la paleta
+                if(isLeftPaddle) {
+                    ball.x = paddle.x + paddle.w + ball.radius + 0.5;
+                } else {
+                    ball.x = paddle.x - ball.radius - 0.5;
+                }
+                
+                // INCREMENTO DE VELOCIDAD (efecto arcade, más ritmo)
+                let currentSpeed = Math.hypot(ball.dx, ball.dy);
+                let newSpeed = Math.min(currentSpeed * SPEED_INCREASE_FACTOR, MAX_SPEED);
+                // Ajustar dirección conservando vector normalizado
+                if(currentSpeed > 0.01) {
+                    ball.dx = (ball.dx / currentSpeed) * newSpeed;
+                    ball.dy = (ball.dy / currentSpeed) * newSpeed;
+                }
+                
+                // Reproducir efecto sutil (no sonido, solo feedback visual)
+                return true;
+            }
+            return false;
+        }
+        
+        // ----- ACTUALIZACIÓN DE IA (movimiento suave y reactivo)-----
+        function updateAI() {
+            // La IA controla la paleta derecha, sigue la pelota con suavizado
+            const targetY = ball.y - (rightPaddle.h/2);
+            const diff = targetY - rightPaddle.y;
+            // movimiento limitado por velocidad máxima de IA
+            let move = 0;
+            if(Math.abs(diff) > 2) {
+                move = diff > 0 ? AI_SPEED : -AI_SPEED;
+                if(Math.abs(diff) < AI_SPEED) move = diff;
+            }
+            rightPaddle.y += move;
+            clampPaddle(rightPaddle);
+        }
+        
+        // ----- MOVIMIENTO DE PALETA IZQUIERDA (mouse) -----
+        let mouseY = CANVAS_H/2;
+        function handleMouseMove(e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleY = canvas.height / rect.height;
+            let y = (e.clientY - rect.top) * scaleY;
+            y = Math.min(Math.max(y, 0), CANVAS_H);
+            // Asignar a la paleta izquierda, centrando el agarre
+            leftPaddle.y = y - leftPaddle.h/2;
+            clampPaddle(leftPaddle);
+        }
+        
+        // ----- ACTUALIZACIÓN DE LA BOLA (física, bordes, puntos)-----
+        function updateBall() {
+            if(waitingForServe) return; // no mover durante pausa
+            
+            // mover bola
+            ball.x += ball.dx;
+            ball.y += ball.dy;
+            
+            // colisión con bordes superior e inferior
+            if(ball.y - ball.radius <= 0) {
+                ball.y = ball.radius + 1;
+                ball.dy = -ball.dy;
+                collisionCooldown = false;
+            }
+            if(ball.y + ball.radius >= CANVAS_H) {
+                ball.y = CANVAS_H - ball.radius - 1;
+                ball.dy = -ball.dy;
+                collisionCooldown = false;
+            }
+            
+            // colisiones con paletas
+            let collided = false;
+            // Paleta izquierda
+            if(handlePaddleCollision(leftPaddle, true)) collided = true;
+            // Paleta derecha
+            if(handlePaddleCollision(rightPaddle, false)) collided = true;
+            
+            // reset cooldown si no hubo colisión en este frame
+            if(!collided) {
+                collisionCooldown = false;
+            } else {
+                // pequeña protección para evitar multiples golpes seguidos
+                setTimeout(() => { collisionCooldown = false; }, 30);
+            }
+            
+            // DETECCIÓN DE GOL (fuera de los bordes izquierdo/derecho)
+            // Borde izquierdo (anota IA)
+            if(ball.x + ball.radius < 0) {
+                handleScore('ai');
+                return;
+            }
+            // Borde derecho (anota Jugador)
+            if(ball.x - ball.radius > CANVAS_W) {
+                handleScore('player');
+                return;
+            }
+        }
+        
+        // ----- DIBUJADO COMPLETO (estilo retro futurista)-----
+        function draw() {
+            ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+            
+            // Fondo estilo campo de juego
+            ctx.fillStyle = "#010006";
+            ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+            
+            // Línea central punteada (efecto vintage)
+            ctx.beginPath();
+            ctx.setLineDash([15, 25]);
+            ctx.strokeStyle = "#0ff88a";
+            ctx.lineWidth = 3;
+            ctx.moveTo(CANVAS_W/2, 0);
+            ctx.lineTo(CANVAS_W/2, CANVAS_H);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            
+            // Círculo central
+            ctx.beginPath();
+            ctx.arc(CANVAS_W/2, CANVAS_H/2, 40, 0, Math.PI*2);
+            ctx.strokeStyle = "cyan";
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            
+            // --- Paleta izquierda (Jugador) con brillo ---
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = "#0ff";
+            ctx.fillStyle = "#eef5ff";
+            ctx.fillRect(leftPaddle.x, leftPaddle.y, leftPaddle.w, leftPaddle.h);
+            ctx.fillStyle = "#4effff";
+            ctx.fillRect(leftPaddle.x+2, leftPaddle.y+5, leftPaddle.w-4, leftPaddle.h-10);
+            
+            // Paleta derecha (IA)
+            ctx.fillStyle = "#f0aaff";
+            ctx.fillRect(rightPaddle.x, rightPaddle.y, rightPaddle.w, rightPaddle.h);
+            ctx.fillStyle = "#ff99ff";
+            ctx.fillRect(rightPaddle.x+2, rightPaddle.y+5, rightPaddle.w-4, rightPaddle.h-10);
+            
+            // --- Pelota (efecto neon)---
+            ctx.shadowBlur = 12;
+            ctx.shadowColor = "#0ff";
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius-1, 0, Math.PI*2);
+            ctx.fillStyle = "#ffffc0";
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius-2, 0, Math.PI*2);
+            ctx.fillStyle = "#fff100";
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            
+            // Efecto estela / partículas sutiles (simular velocidad)
+            ctx.beginPath();
+            ctx.arc(ball.x - ball.dx*1.2, ball.y - ball.dy*1.2, ball.radius-3, 0, Math.PI*2);
+            ctx.fillStyle = "#0ff6";
+            ctx.fill();
+            
+            // Marcadores dentro del canvas (versión decorativa)
+            ctx.font = "bold 42px 'Courier New', monospace";
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = "#0aefef66";
+            ctx.fillText(playerScore, CANVAS_W*0.25 - 30, 70);
+            ctx.fillStyle = "#ef9eff66";
+            ctx.fillText(aiScore, CANVAS_W*0.75 - 25, 70);
+            
+            ctx.font = "bold 20px monospace";
+            ctx.fillStyle = "#88aaff";
+            ctx.fillText("MOUSE", leftPaddle.x-10, leftPaddle.y-8);
+            ctx.fillStyle = "#dd88ff";
+            ctx.fillText("AI", rightPaddle.x+8, rightPaddle.y-8);
+            
+            // Mensaje de saque cuando waitingForServe
+            if(waitingForServe) {
+                ctx.font = "bold 24px 'Courier New'";
+                ctx.fillStyle = "#ffdd88";
+                ctx.shadowBlur = 6;
+                ctx.shadowColor = "#ffaa33";
+                ctx.fillText("⚡ SERVIDOR ⚡", CANVAS_W/2-110, CANVAS_H-45);
+                ctx.font = "16px monospace";
+                ctx.fillStyle = "#aaddff";
+                ctx.fillText("preparando siguiente saque...", CANVAS_W/2-130, CANVAS_H-18);
+                ctx.shadowBlur = 0;
+            }
+            
+            // Efecto de rejilla decorativa
+            ctx.globalAlpha = 0.1;
+            for(let i=0; i<CANVAS_W; i+=40){
+                ctx.beginPath();
+                ctx.moveTo(i,0);
+                ctx.lineTo(i,CANVAS_H);
+                ctx.strokeStyle = "#0ff";
+                ctx.stroke();
+            }
+            for(let i=0; i<CANVAS_H; i+=40){
+                ctx.beginPath();
+                ctx.moveTo(0,i);
+                ctx.lineTo(CANVAS_W,i);
+                ctx.stroke();
+            }
+            ctx.globalAlpha = 1;
+        }
+        
+        // ----- BUCLE PRINCIPAL (UPDATE + DRAW) -----
+        let animationId = null;
+        
+        function gameLoop() {
+            // 1. Actualizar IA (siempre activa, incluso en pausa se mueve pero sin bola no afecta)
+            updateAI();
+            
+            // 2. Actualizar física de la bola (si no está en servicio)
+            updateBall();
+            
+            // 3. Dibujar todo
+            draw();
+            
+            // 4. Continuar animación
+            animationId = requestAnimationFrame(gameLoop);
+        }
+        
+        // ----- INICIALIZAR EVENTOS Y ARRANCAR -----
+        function init() {
+            fullResetGame();    // estado inicial con bola moviéndose
+            // Evento de mouse para mover la paleta izquierda
+            canvas.addEventListener('mousemove', handleMouseMove);
+            canvas.addEventListener('mouseleave', () => {
+                // no hacer nada, solo evitar que se quede pegado, pero la paleta no se mueve fuera
+            });
+            
+            // Botón reset reinicia completamente todo, cancela saques y reinicia el marcador
+            resetBtn.addEventListener('click', () => {
+                if(serveTimeout) {
+                    clearTimeout(serveTimeout);
+                    serveTimeout = null;
+                }
+                waitingForServe = false;
+                fullResetGame();
+                // Asegurar que la paleta izquierda mantiene la posición con mouse
+                // pero restablece también vars
+                collisionCooldown = false;
+                lastScoredSide = null;
+                // Forzar a que el mouse actualice paleta si es necesario
+                // no hay problema, la posición del mouse permanece pero leftPaddle ya se centró
+            });
+            
+            // Arrancar el juego
+            gameLoop();
+        }
+        
+        init();
+    })();
+</script>
+</body>
+</html>
