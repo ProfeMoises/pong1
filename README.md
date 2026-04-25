@@ -66,3 +66,64 @@ El botón **⟳ REINICIAR** resetea completamente el marcador (jugador 0 - IA 0)
 
 ### Física del movimiento
 La velocidad de la bola se normaliza tras cada colisión para mantener la coherencia. El ángulo de rebote se calcula así:
+
+hitPercent = (y_bola - centro_paleta) / (alto_paleta/2)
+nuevo_dy = dy_actual + (hitPercent * 3.2)
+
+
+Ese nuevo `dy` se limita a un rango de -6.5 a +6.5 para evitar ángulos demasiado absurdos.
+
+### Rendimiento
+El juego corre a **60 FPS** estables en cualquier navegador moderno (Chrome, Firefox, Edge, Safari). La IA no consume recursos excesivos y el canvas se redibuja solo cuando es necesario.
+
+---
+
+## 🕹️ ¿Por qué jugar a Pong hoy?
+
+- **Simplicidad adictiva**: fácil de aprender, difícil de dominar.
+- **Entrenamiento de reflejos**: mejora tu coordinación ojo-mano.
+- **Nostalgia**: revive el amanecer de la industria de los videojuegos.
+- **Sin distracciones**: partidas rápidas, perfectas para descansos cortos.
+
+---
+
+## 📂 Cómo ejecutar el juego
+
+1. Guarda el código HTML/CSS/JS proporcionado en un archivo con extensión `.html` (por ejemplo, `pong.html`).
+2. Haz doble clic sobre el archivo o ábrelo con tu navegador web.
+3. Mueve el mouse dentro del área negra para comenzar a jugar.
+4. Pulsa el botón **REINICIAR** cuando quieras empezar desde cero.
+
+> 💡 *Consejo:* si la paleta responde lento, asegúrate de que no haya otras animaciones pesadas en otras pestañas. El juego es ligero por naturaleza.
+
+---
+
+## 🚀 Posibles mejoras futuras (versión extendida)
+
+- Modo para dos jugadores (un jugador con teclado y otro con ratón).
+- Efectos de sonido (golpe, punto, saque).
+- Selector de dificultad de IA (velocidad, precisión).
+- Guardado de récords locales con `localStorage`.
+- Tabla de puntuaciones máximas.
+
+---
+
+## 🙏 Créditos y agradecimientos
+
+- **Diseño e implementación**: inspirado en el código fuente original de Pong y en la comunidad de desarrolladores retro.
+- **Efectos visuales**: mezcla de estética arcade de los 80 con toques modernos.
+- **Pruebas de juego**: amigos y entusiastas de los juegos clásicos.
+
+---
+
+## 📜 Licencia
+
+Este juego se distribuye con fines educativos y de entretenimiento. Puedes modificar y compartir libremente, siempre que se mencione la fuente original.
+
+---
+
+**¡A jugar!** 🎾  
+Desliza el mouse, anticipa los rebotes y demuestra quién manda en la mesa de Pong.  
+¿Podrás vencer a la máquina?
+
+[▶️ Haz clic aquí para jugar ahora (si estás viendo el README dentro del proyecto, abre el archivo .html)]
